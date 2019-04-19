@@ -9,6 +9,7 @@ import sys
 import numpy as np
 import random
 import os
+import glob
 import matplotlib.pyplot as plt
 
 class MetaAgent():
@@ -97,9 +98,9 @@ class MetaAgent():
 		print("loading data")
 		# ds is a numpy array of shape (num_agents, num_turns, state_dim + action_dim)
 		ds = []
-		for agent in os.listdir('data'):
+		for agent in glob.glob("data/*.txt"):
 			d = []
-			with open(os.path.join('data',agent), "rb") as f:
+			with open(agent, "rb") as f:
 				# while True:
 				for i in range(40000):
 					turn = f.read(self.state_dim + self.action_dim)
