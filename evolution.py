@@ -76,7 +76,7 @@ class Evolution():
         stats.register("max", np.max)
         self.stats = stats
 
-    def evolve(self, crossover_prob = 0.5, mutation_prob = 0.1, num_generation = 20, pop_size = 20):
+    def evolve(self, crossover_prob = 0.5, mutation_prob = 0.1, num_generation = 20, pop_size = 20, elitism = 5):
         #clear stats for graphing
         self.max_fitness = []
         self.min_fitness = []
@@ -117,9 +117,8 @@ class Evolution():
 
             #Update the best gene so far
             hof.update(offspring)
-            # The population is replaced by the best of new generation and previous generation
-            ##  This might contribute to a lack of diversity, consider changing if it becomes an issue
-            pop[:] = self.toolbox.select(offspring + pop, pop_size)
+
+            pop[:] = self.toolbox.select(pop, elitism) + self.toolbox.select(offspring, len(pop) - elitism)
 
         # returns the best gene
         return hof
@@ -140,6 +139,6 @@ if __name__ == '__main__':
     model = get_model("model/generator.h5")
     ### Uses Tournament Selection right now randomized - (Best of [tournamentsize]) 
     ev = Evolution(tournamentSize = 5, independence = 0.1)
-    individuals = ev.evolve(crossover_prob = 0.5, mutation_prob = 0.4, num_generation = 100, pop_size = 30)
+    individuals = ev.evolve(crossover_prob = 0.5, mutation_prob = 0.4, num_generation = 150, pop_size = 30)
     ev.plot()
 
