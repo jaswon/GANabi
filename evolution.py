@@ -123,6 +123,14 @@ class Evolution():
         # returns the best gene
         return hof
 
+    def evolve_preset(self, crossover_prob = 0.5, mutation_prob = 0.4, num_generation = 20, pop_size = 20, mu = 30, lam = 15):
+        pop = self.toolbox.population(n=pop_size)
+        self.generations = num_generation + 1
+        #individuals, stats = algorithms.eaSimple(pop, self.toolbox, crossover_prob, mutation_prob, num_generation, stats = self.stats, verbose = True)
+        individuals, stats = algorithms.eaMuPlusLambda(pop, self.toolbox, mu, lam, crossover_prob, mutation_prob, num_generation, stats = self.stats, verbose = True)
+        self.avg_fitness, self.max_fitness, self.min_fitness = stats.select('avg', 'max', 'min')
+        return individuals
+
     def plot(self):
         plt.plot(range(self.generations), self.avg_fitness, label="Average Fitness")
         plt.plot(range(self.generations), self.max_fitness,  label="Maximum Fitness")
@@ -139,6 +147,7 @@ if __name__ == '__main__':
     model = get_model("model/generator.h5")
     ### Uses Tournament Selection right now randomized - (Best of [tournamentsize]) 
     ev = Evolution(tournamentSize = 5, independence = 0.1)
-    individuals = ev.evolve(crossover_prob = 0.5, mutation_prob = 0.4, num_generation = 150, pop_size = 30)
+    #individuals = ev.evolve(crossover_prob = 0.5, mutation_prob = 0.5, num_generation = 150, pop_size = 30)
+    individuals  = ev.evolve_preset(crossover_prob = 0.5, mutation_prob = 0.5, num_generation = 250, pop_size = 30)
     ev.plot()
 
