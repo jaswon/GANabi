@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 def load_data(dataFile, samples = 50000):
     print("LOADING DATA")
-    df = open(dataFile, mode = 'r', newline = '\n')
+    df = open(dataFile, mode = 'r')
     iterations = 0
     inputs = []
     outputs = []
@@ -27,11 +27,9 @@ def load_data(dataFile, samples = 50000):
 
 def split_data(gamestates, labels):
     data = [[] for i in range(20)]
-    print(labels[1])
-    print(np.argmax(labels[1]))
     for g, l in zip(gamestates, labels):
         index = np.argmax(l)
-        data[index] = g
+        data[index].append(g)
     return data
 
 def plot_distribution(data):
@@ -45,8 +43,7 @@ def plot_distribution(data):
     plt.ylabel("Number of samples")
     plt.show()
 
-
-state, action = load_data("data/iggi.txt")
+state, action = load_data("data/internal.txt")
 data = split_data(state, action)
 
 plot_distribution(data)

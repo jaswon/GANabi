@@ -118,7 +118,7 @@ class MetaAgent():
 		print("done loading data")
 
 	def get_samples(self, num_samples):
-		s = np.array([ random.sample(agent, self.deg_pack) for agent in random.choices(self.ds, k=num_samples) ])
+		s = np.array([random.sample(agent, self.deg_pack) for agent in random.choices(self.ds, k=num_samples) ])
 		return s[:,:,:self.state_dim], s[:,:,self.state_dim:]
 
 	def train(self, epochs, batch_size=128, sample_interval=50):
@@ -197,9 +197,8 @@ class MetaAgent():
 		plt.grid(True)
 		plt.show()
 
-
 if __name__ == '__main__':
 	use_saved = sys.argv[1] if len(sys.argv) > 1 else None
 	meta_agent = MetaAgent(use_saved)
 	meta_agent.load_data()
-	meta_agent.train(epochs=2000, batch_size=256, sample_interval=200)
+	meta_agent.train(epochs=5000, batch_size=256, sample_interval=200)

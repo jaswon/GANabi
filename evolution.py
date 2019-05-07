@@ -1,7 +1,7 @@
 from keras.models import load_model
 import numpy as np
 import random
-from deap import base, creator, tools, algorithms
+from deap import base, creator, tools, algorithms, cma
 import matplotlib.pyplot as plt
 from keras.optimizers import RMSprop
 
@@ -68,6 +68,12 @@ class Evolution():
         toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=1, indpb=independence)
         toolbox.register("select", tools.selTournament, tournsize=tournamentSize)
         toolbox.register("evaluate", evaluate)
+
+        #cma strategy, can add lambda_= pop_size
+        strategy = cma.Strategy(centroid=np.random.normal(0,1, (100,)), sigma=1.0)
+        toolbox.register("generate", strategy.generate, creator.Individual)
+        toolbox.register("update", strategy.update)
+
         self.toolbox = toolbox
         #Statistics gathering
         stats = tools.Statistics(key=lambda ind: ind.fitness.values)
@@ -123,31 +129,37 @@ class Evolution():
         # returns the best gene
         return hof
 
-    def evolve_preset(self, crossover_prob = 0.5, mutation_prob = 0.4, num_generation = 20, pop_size = 20, mu = 30, lam = 15):
+    def evolve_preset(self, crossover_prob = 0.5, mutation_prob = 0.4, num_generation = 20, pop_size = 20, mu = 100, lam = 30):
         pop = self.toolbox.population(n=pop_size)
         self.generations = num_generation + 1
         #individuals, stats = algorithms.eaSimple(pop, self.toolbox, crossover_prob, mutation_prob, num_generation, stats = self.stats, verbose = True)
-        individuals, stats = algorithms.eaMuPlusLambda(pop, self.toolbox, mu, lam, crossover_prob, mutation_prob, num_generation, stats = self.stats, verbose = True)
+        #individuals, stats = algorithms.eaMuPlusLambda(pop, self.toolbox, mu, lam, crossover_prob, mutation_prob, num_generation, stats = self.stats, verbose = True)
+        #individuals, stats = algorithms.eaMuCommaLambda(pop, self.toolbox, mu, lam, crossover_prob, mutation_prob, num_generation, stats = self.stats, verbose = True)
+        #CMA-ES
+        individuals, stats = algorithms.eaGenerateUpdate(self.toolbox, num_generation, stats = self.stats,  verbose=True)
+        #Differential Evolution
         self.avg_fitness, self.max_fitness, self.min_fitness = stats.select('avg', 'max', 'min')
         return individuals
 
-    def plot(self):
-        plt.plot(range(self.generations), self.avg_fitness, label="Average Fitness")
-        plt.plot(range(self.generations), self.max_fitness,  label="Maximum Fitness")
-        plt.plot(range(self.generations), self.min_fitness, label="Minimum Fintess")
+    def plot(self, name):
+        plt.plot(range(len(self.avg_fitness)), self.avg_fitness, label="Average Fitness")
+        plt.plot(range(len(self.max_fitness)), self.max_fitness,  label="Maximum Fitness")
+        plt.plot(range(len(self.min_fitness)), self.min_fitness, label="Minimum Fintess")
         plt.xlabel('Generation')
         plt.ylabel('Accuracy')
         plt.legend()
         plt.title('GAN Evaluation')
         plt.grid(True)
-        plt.show()
+        plt.savefig("Evolution/" + name)
 
 if __name__ == '__main__':
     inputs, outputs = load_data("data/vdb-paper.txt", samples = 10000)
-    model = get_model("model/generator.h5")
-    ### Uses Tournament Selection right now randomized - (Best of [tournamentsize]) 
-    ev = Evolution(tournamentSize = 5, independence = 0.1)
-    #individuals = ev.evolve(crossover_prob = 0.5, mutation_prob = 0.5, num_generation = 150, pop_size = 30)
-    individuals  = ev.evolve_preset(crossover_prob = 0.5, mutation_prob = 0.5, num_generation = 250, pop_size = 30)
-    ev.plot()
+    x = ["model_4", "model_5", "model_6"]
+    for name in x:
+        model = get_model(name + "/generator.h5")
+        ### Uses Tournament Selection right now randomized - (Best of [tournamentsize]) 
+        ev = Evolution(tournamentSize = 5, independence = 0.1)
+        #individuals = ev.evolve(crossover_prob = 0.5, mutation_prob = 0.5, num_generation = 150, pop_size = 30)
+        individuals  = ev.evolve_preset(crossover_prob = 0.9, mutation_prob = 0.1, num_generation = 70, pop_size = 100)
+        ev.plot(name)
 

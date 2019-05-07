@@ -1,0 +1,6 @@
+batchsize = 256
+samplesize = 200
+structure = 64, 128, 256
+activation = Leaky Relu (0.2, l2=0.001), Sigmoid
+Adam (lr = 0.0002)
+Momentum = 0.8
