@@ -13,18 +13,18 @@ def load_data(dataFile, samples = 50000):
     inputs = []
     outputs = []
     while True:
-        data = df.read(592)
+        data = df.read(1735)
         if (len(data)== 0):
             break
         if (data[0] == "-"):
             continue
-        if (iterations > samples):
+        if (samples and iterations > samples):
             break
         else:
             iterations += 1
             line = list(map(int, data))
-            inputs.append(line[:572])
-            outputs.append(line[572:])
+            inputs.append(line[:561])
+            outputs.append(line[561:581])
     df.close()
     print("LOADING DONE")
     return np.array(inputs), np.array(outputs)
@@ -53,6 +53,7 @@ class Evolution():
         self.avg_fitness = []
         self.max_fitness = []
         self.min_fitness = []
+        self.hof = tools.HallOfFame(1)
 
         #Individual to evolve.
         creator.create("FitnessMax", base.Fitness, weights=(1.0,))
@@ -95,7 +96,6 @@ class Evolution():
         for ind, fit in zip(pop, fitnesses):
             ind.fitness.values = fit
         #Record the best result
-        hof = tools.HallOfFame(1)
         #evolve 
         for g in range(num_generation):
             print("Generation {}".format(g + 1))
@@ -122,7 +122,7 @@ class Evolution():
             print("Average Fitness {}".format(record['avg']))
 
             #Update the best gene so far
-            hof.update(offspring)
+            self.hof.update(offspring)
 
             pop[:] = self.toolbox.select(pop, elitism) + self.toolbox.select(offspring, len(pop) - elitism)
 
@@ -136,10 +136,10 @@ class Evolution():
         #individuals, stats = algorithms.eaMuPlusLambda(pop, self.toolbox, mu, lam, crossover_prob, mutation_prob, num_generation, stats = self.stats, verbose = True)
         #individuals, stats = algorithms.eaMuCommaLambda(pop, self.toolbox, mu, lam, crossover_prob, mutation_prob, num_generation, stats = self.stats, verbose = True)
         #CMA-ES
-        individuals, stats = algorithms.eaGenerateUpdate(self.toolbox, num_generation, stats = self.stats,  verbose=True)
+        individuals, stats = algorithms.eaGenerateUpdate(self.toolbox, num_generation, halloffame= self.hof, stats = self.stats,verbose=True)
         #Differential Evolution
         self.avg_fitness, self.max_fitness, self.min_fitness = stats.select('avg', 'max', 'min')
-        return individuals
+        return individuals, self.hof
 
     def plot(self, name):
         plt.plot(range(len(self.avg_fitness)), self.avg_fitness, label="Average Fitness")
@@ -151,15 +151,37 @@ class Evolution():
         plt.title('GAN Evaluation')
         plt.grid(True)
         plt.savefig("Evolution/" + name)
+        plt.close()
+
+    def predict(self, model, state, action, name):
+        latent_space = np.tile(np.array(self.hof[0]), (state.shape[0], 1))
+        labels = model.predict([latent_space, state])
+        gen = [0 for i in range(20)]
+        for lab in labels:
+            gen[np.argmax(lab)] += 1
+        real = [0 for i in range(20)]
+        for lab in action:
+            gen[np.argmax(lab)] += 1
+
+        plt.bar(range(20), gen, label = "Generated")
+        plt.bar(range(20), real, label = "Real")
+        plt.xlabel("Label")
+        plt.ylabel("Samples")
+        plt.title("Evolved Generator")
+        plt.grid(True)
+        plt.savefig("Evolution/" + name)
 
 if __name__ == '__main__':
-    inputs, outputs = load_data("data/vdb-paper.txt", samples = 10000)
-    x = ["model_4", "model_5", "model_6"]
+    state, action = load_data("data/piers.txt", samples = 20000)
+    inputs = state[:10000, :]
+    outputs = action[:10000, :]
+    x = ["model"]
     for name in x:
         model = get_model(name + "/generator.h5")
         ### Uses Tournament Selection right now randomized - (Best of [tournamentsize]) 
         ev = Evolution(tournamentSize = 5, independence = 0.1)
         #individuals = ev.evolve(crossover_prob = 0.5, mutation_prob = 0.5, num_generation = 150, pop_size = 30)
-        individuals  = ev.evolve_preset(crossover_prob = 0.9, mutation_prob = 0.1, num_generation = 70, pop_size = 100)
+        individuals, hof  = ev.evolve_preset(crossover_prob = 0.9, mutation_prob = 0.1, num_generation = 50, pop_size = 100)
+        ev.predict(model, state, action, name + "Distribution")
         ev.plot(name)
 

@@ -3,7 +3,7 @@ from keras.models import Sequential, Model, load_model
 from keras.layers import Flatten, Input, Dense, Dropout, BatchNormalization, Lambda, GRU, LSTM, Bidirectional, concatenate
 from keras.layers.advanced_activations import LeakyReLU
 from keras.regularizers import l2
-from keras.optimizers import Adam, SGD, RMSprop, Nadam
+from keras.optimizers import Adam, SGD, RMSprop, Nadam, Adagrad, Adadelta
 
 import sys
 import numpy as np
@@ -16,14 +16,21 @@ class MetaAgent():
 	def __init__(self,use_saved):
 		# Input shape
 		self.latent_dim = 100 # latent dimension
-		self.state_dim = 572 # state dimension
+		self.state_dim = 561 # state dimension
 		self.action_dim = 20 # action dimension
 		self.deg_pack = 16 # packing degree (number of samples to send to discriminator)
+		self.forward_dim = 1154
 
-		opt = Adam(0.0002, 0.5, clipnorm=1)
+		#Generator
+		g_opt = Adam(0.0002, 0.5, clipnorm=1)
 		# opt = SGD(0.001)
 		# opt = RMSprop(lr=0.001)
-		# opt = Nadam(0.0001, 0.5, clipnorm=1)
+		# opt = Nadam(0.001, 0.5, clipnorm=1)
+		# g_opt = Adagrad(lr=0.01, epsilon=None, decay=0.0, clipnorm = 5)
+		#opt = Adadelta(lr=1.0, rho=0.95, epsilon=None, decay=0.0, clipnorm = 3)
+
+		#Discriminator
+		d_opt = SGD(0.001)
 
 		# build generator and discriminator
 		if use_saved:
@@ -31,9 +38,10 @@ class MetaAgent():
 			self.discriminator = load_model('{}/discriminator.h5'.format(use_saved))
 		else:
 			self.generator = self.build_generator()
+			self.generator.compile(loss=['categorical_crossentropy'], optimizer = g_opt)
 			self.discriminator = self.build_discriminator()
 			self.discriminator.compile(loss=['binary_crossentropy'],
-					optimizer=opt,
+					optimizer=d_opt,
 					metrics=['accuracy'])
 
 		# the generator takes noise and states as input
@@ -53,14 +61,14 @@ class MetaAgent():
 		valid = self.discriminator([states, actions])
 
 		self.combined = Model([noise, states], valid)
-		self.combined.compile(loss=['binary_crossentropy'], optimizer=opt)
+		self.combined.compile(loss=['binary_crossentropy'], optimizer=g_opt)
 
 	def build_generator(self):
 		model = Sequential([
-			Dense(128, input_dim=self.latent_dim + self.state_dim),
+			Dense(256, input_dim=self.latent_dim + self.state_dim),
 			LeakyReLU(alpha=0.2),
 			BatchNormalization(momentum=0.8),
-			Dense(256),
+			Dense(128),
 			LeakyReLU(alpha=0.2),
 			BatchNormalization(momentum=0.8),
 			Dense(self.action_dim, activation='sigmoid'),
@@ -76,15 +84,15 @@ class MetaAgent():
 		model = Sequential([
 			Flatten(),
 			# Bidirectional(LSTM(64,input_shape=(self.state_dim+self.action_dim,))),
-			Dense(64, kernel_regularizer=l2(0.001)),
+			Dense(300, kernel_regularizer=l2(0.001)),
 			LeakyReLU(alpha=0.2),
-			Dropout(0.4),
-			Dense(128, kernel_regularizer=l2(0.001)),
+			Dropout(0.5),
+			Dense(200, kernel_regularizer=l2(0.001)),
 			LeakyReLU(alpha=0.2),
-			Dropout(0.4),
-			Dense(256, kernel_regularizer=l2(0.001)),
+			Dropout(0.5),
+			Dense(100, kernel_regularizer=l2(0.001)),
 			LeakyReLU(alpha=0.2),
-			Dropout(0.4),
+			Dropout(0.5),
 			Dense(1, activation='sigmoid'),
 		])
 
@@ -103,13 +111,13 @@ class MetaAgent():
 			with open(agent, "rb") as f:
 				# while True:
 				for i in range(40000):
-					turn = f.read(self.state_dim + self.action_dim)
+					turn = f.read(self.state_dim + self.action_dim + self.forward_dim)
 					if not turn:
 						break
 					if turn[0] == 45:
 						# break
 						continue
-					d.append([bit-48 for bit in turn])
+					d.append([bit-48 for bit in turn[:581]])
 			print("done loading agent {}".format(agent))
 			ds.append(d)
 		self.ds = ds
@@ -126,6 +134,8 @@ class MetaAgent():
 		# adversarial ground truths
 		valid = np.ones((batch_size, 1))
 		fake = np.zeros((batch_size, 1))
+		noisy_valid = np.random.uniform(0.7, 1.0, (batch_size, 1))
+		noisy_fake = np.random.uniform(0, 0.3, (batch_size, 1))
 
 		try:
 			os.mkdir('model')
@@ -201,4 +211,4 @@ if __name__ == '__main__':
 	use_saved = sys.argv[1] if len(sys.argv) > 1 else None
 	meta_agent = MetaAgent(use_saved)
 	meta_agent.load_data()
-	meta_agent.train(epochs=5000, batch_size=256, sample_interval=200)
+	meta_agent.train(epochs=1000, batch_size=256, sample_interval=200)

@@ -9,7 +9,7 @@ def load_data(dataFile, samples = 50000):
     inputs = []
     outputs = []
     while True:
-        data = df.read(592)
+        data = df.read(1735)
         if (len(data)== 0):
             break
         if (data[0] == "-"):
@@ -19,8 +19,8 @@ def load_data(dataFile, samples = 50000):
         else:
             iterations += 1
             line = list(map(int, data))
-            inputs.append(line[:572])
-            outputs.append(line[572:])
+            inputs.append(line[:561])
+            outputs.append(line[561:581])
     df.close()
     print("LOADING DONE")
     return np.array(inputs), np.array(outputs)
@@ -43,7 +43,7 @@ def plot_distribution(data):
     plt.ylabel("Number of samples")
     plt.show()
 
-state, action = load_data("data/internal.txt")
+state, action = load_data("data/iggi.txt")
 data = split_data(state, action)
 
 plot_distribution(data)
