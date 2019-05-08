@@ -18,7 +18,7 @@ def load_data(dataFile, samples = 50000):
             break
         if (data[0] == "-"):
             continue
-        if (samples and iterations > samples):
+        if (iterations > samples):
             break
         else:
             iterations += 1
@@ -34,12 +34,10 @@ def get_model(modelName):
     model = load_model(modelName)
     opt = RMSprop(lr=0.001)
     model.compile(optimizer = opt, loss=['categorical_crossentropy'], metrics = ['accuracy'])
-    model.summary()
     return model
 
 #Fitness Function
 def evaluate(individaul):
-    print(inputs.shape)
     latent_space = np.tile(np.array(individaul), (inputs.shape[0], 1))
     score = model.evaluate([latent_space, inputs], outputs)
     return [score[1]]
@@ -161,27 +159,33 @@ class Evolution():
             gen[np.argmax(lab)] += 1
         real = [0 for i in range(20)]
         for lab in action:
-            gen[np.argmax(lab)] += 1
-
-        plt.bar(range(20), gen, label = "Generated")
-        plt.bar(range(20), real, label = "Real")
-        plt.xlabel("Label")
-        plt.ylabel("Samples")
-        plt.title("Evolved Generator")
+            real[np.argmax(lab)] += 1
+        fig, ax = plt.subplots()
+        np.array(gen).shape
+        ax.bar(np.arange(0, 40, step = 2), np.array(gen) / total, label = "Generated")
+        ax.bar(np.arange(1, 41, step = 2), np.array(real) / total, label = "Real")
+        ax.set_xlabel("Label")
+        ax.set_ylabel("Samples")
+        ax.set_title("Evolved Generator")
+        ax.legend()
         plt.grid(True)
         plt.savefig("Evolution/" + name)
+        plt.close()
 
 if __name__ == '__main__':
-    state, action = load_data("data/piers.txt", samples = 20000)
-    inputs = state[:10000, :]
-    outputs = action[:10000, :]
+    print(np.arange(0, 20, step = 2))
+    print(np.array([0 for i in range(20)]).shape)
+    total = 10000
+    state, action = load_data("data/iggi.txt", samples = total)
+    inputs = state
+    outputs = action
     x = ["model"]
     for name in x:
         model = get_model(name + "/generator.h5")
         ### Uses Tournament Selection right now randomized - (Best of [tournamentsize]) 
-        ev = Evolution(tournamentSize = 5, independence = 0.1)
+        ev = Evolution(tournamentSize = 5, independence = 0.1) 
         #individuals = ev.evolve(crossover_prob = 0.5, mutation_prob = 0.5, num_generation = 150, pop_size = 30)
-        individuals, hof  = ev.evolve_preset(crossover_prob = 0.9, mutation_prob = 0.1, num_generation = 50, pop_size = 100)
+        individuals, hof  = ev.evolve_preset(crossover_prob = 0.9, mutation_prob = 0.1, num_generation = 10, pop_size = 100)
         ev.predict(model, state, action, name + "Distribution")
         ev.plot(name)
 
