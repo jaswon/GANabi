@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from keras.models import Sequential, Model, load_model
 
 
 def load_data(dataFile, samples = 50000):
@@ -43,9 +44,17 @@ def plot_distribution(data):
     plt.ylabel("Number of samples")
     plt.show()
 
-state, action = load_data("data/iggi.txt")
-data = split_data(state, action)
+#state, action = load_data("data/iggi.txt")
+#data = split_data(state, action)
 
-plot_distribution(data)
+#plot_distribution(data)
+model_name = "models/bidirectional/"
+model = load_model(model_name + "discriminator.h5")
+#model.summary()
+i = 0
+for layer in model.layers:
+    config = layer.get_config()
+    for l in config['layers']:
+        print(l)
 
 

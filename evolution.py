@@ -14,6 +14,7 @@ def load_data(dataFile, samples = 50000):
     outputs = []
     while True:
         data = df.read(1735)
+        #data = df.read(592)
         if (len(data)== 0):
             break
         if (data[0] == "-"):
@@ -25,6 +26,8 @@ def load_data(dataFile, samples = 50000):
             line = list(map(int, data))
             inputs.append(line[:561])
             outputs.append(line[561:581])
+            #inputs.append(line[:572])
+            #outputs.append(line[572:])
     df.close()
     print("LOADING DONE")
     return np.array(inputs), np.array(outputs)
@@ -162,8 +165,8 @@ class Evolution():
             real[np.argmax(lab)] += 1
         fig, ax = plt.subplots()
         np.array(gen).shape
-        ax.bar(np.arange(0, 40, step = 2), np.array(gen) / total, label = "Generated")
-        ax.bar(np.arange(1, 41, step = 2), np.array(real) / total, label = "Real")
+        ax.bar(np.arange(0, 20, step = 1), np.array(gen) / total, label = "Generated")
+        ax.bar(np.arange(0.5, 20.5, step = 1), np.array(real) / total, label = "Real")
         ax.set_xlabel("Label")
         ax.set_ylabel("Samples")
         ax.set_title("Evolved Generator")
@@ -173,8 +176,6 @@ class Evolution():
         plt.close()
 
 if __name__ == '__main__':
-    print(np.arange(0, 20, step = 2))
-    print(np.array([0 for i in range(20)]).shape)
     total = 10000
     state, action = load_data("data/iggi.txt", samples = total)
     inputs = state
@@ -185,7 +186,7 @@ if __name__ == '__main__':
         ### Uses Tournament Selection right now randomized - (Best of [tournamentsize]) 
         ev = Evolution(tournamentSize = 5, independence = 0.1) 
         #individuals = ev.evolve(crossover_prob = 0.5, mutation_prob = 0.5, num_generation = 150, pop_size = 30)
-        individuals, hof  = ev.evolve_preset(crossover_prob = 0.9, mutation_prob = 0.1, num_generation = 10, pop_size = 100)
+        individuals, hof  = ev.evolve_preset(crossover_prob = 0.9, mutation_prob = 0.1, num_generation = 25, pop_size = 100)
         ev.predict(model, state, action, name + "Distribution")
         ev.plot(name)
 
