@@ -12,25 +12,32 @@ import os
 import glob
 import matplotlib.pyplot as plt
 
+def _loss(y_true, y_pred):
+	return -K.mean(K.log(y_pred))
+
 class MetaAgent():
-	def __init__(self,use_saved):
+	def __init__(self,use_saved, pretrain = False):
 		# Input shape
 		self.latent_dim = 100 # latent dimension
 		self.state_dim = 561 # state dimension
 		self.action_dim = 20 # action dimension
-		self.deg_pack = 16 # packing degree (number of samples to send to discriminator)
+		self.deg_pack = 8 # packing degree (number of samples to send to discriminator)
 		self.forward_dim = 1154
-
+		np.random.seed()
 		#Generator
-		g_opt = Adam(0.0002, 0.5, clipnorm=1)
-		# opt = SGD(0.001)
-		# opt = RMSprop(lr=0.001)
-		# opt = Nadam(0.001, 0.5, clipnorm=1)
-		# g_opt = Adagrad(lr=0.01, epsilon=None, decay=0.0, clipnorm = 5)
-		#opt = Adadelta(lr=1.0, rho=0.95, epsilon=None, decay=0.0, clipnorm = 3)
+		g_opt = Adam(lr=0.0002, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False, clipvalue = 1)
+		#g_opt = SGD(0.001)
+		#g_opt = RMSprop(lr=0.001, clipvalue = 1)
+		#g_opt = Nadam(0.001, 0.5, clipvalue=3)
+		#g_opt = Adagrad(lr=0.01, epsilon=None, decay=0.0, clipnorm = 5)
+		#g_opt = Adadelta(lr=1.0, rho=0.95, epsilon=None, decay=0.0, clipnorm = 3)
 
 		#Discriminator
-		d_opt = SGD(0.001)
+		d_opt = Adam(lr=0.0002, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False, clipvalue = 1)
+		#d_opt = SGD(0.001)
+		#d_opt = Adagrad(lr=0.01, epsilon=None, decay=0.0, clipnorm = 5)
+		#d_opt = RMSprop(lr=0.001, clipvalue = 1)
+		#d_opt = Nadam(0.0001, 0.5, clipvalue=3)
 
 		# build generator and discriminator
 		if use_saved:
@@ -61,14 +68,19 @@ class MetaAgent():
 		valid = self.discriminator([states, actions])
 
 		self.combined = Model([noise, states], valid)
+		#self.combined.compile(loss=['kullback_leibler_divergence'], optimizer=g_opt)
 		self.combined.compile(loss=['binary_crossentropy'], optimizer=g_opt)
 
 	def build_generator(self):
 		model = Sequential([
-			Dense(256, input_dim=self.latent_dim + self.state_dim),
+			Dense(500, input_dim=self.latent_dim + self.state_dim),
 			LeakyReLU(alpha=0.2),
 			BatchNormalization(momentum=0.8),
-			Dense(128),
+			Dropout(rate = 0.5),
+			Dense(300),
+			LeakyReLU(alpha=0.2),
+			BatchNormalization(momentum=0.8),
+			Dense(100),
 			LeakyReLU(alpha=0.2),
 			BatchNormalization(momentum=0.8),
 			Dense(self.action_dim, activation='sigmoid'),
@@ -82,17 +94,16 @@ class MetaAgent():
 
 	def build_discriminator(self):
 		model = Sequential([
-			Flatten(),
-			# Bidirectional(LSTM(64,input_shape=(self.state_dim+self.action_dim,))),
+			#Flatten(),
+			Bidirectional(LSTM(64,input_shape=(self.state_dim+self.action_dim,))),
 			Dense(300, kernel_regularizer=l2(0.001)),
 			LeakyReLU(alpha=0.2),
-			Dropout(0.5),
+			Dropout(rate = 0.5),
 			Dense(200, kernel_regularizer=l2(0.001)),
 			LeakyReLU(alpha=0.2),
-			Dropout(0.5),
+			Dropout(rate = 0.5),
 			Dense(100, kernel_regularizer=l2(0.001)),
 			LeakyReLU(alpha=0.2),
-			Dropout(0.5),
 			Dense(1, activation='sigmoid'),
 		])
 
@@ -117,7 +128,7 @@ class MetaAgent():
 					if turn[0] == 45:
 						# break
 						continue
-					d.append([bit-48 for bit in turn[:581]])
+					d.append([(bit-48) for bit in turn[:581]])
 			print("done loading agent {}".format(agent))
 			ds.append(d)
 		self.ds = ds
@@ -129,13 +140,13 @@ class MetaAgent():
 		s = np.array([random.sample(agent, self.deg_pack) for agent in random.choices(self.ds, k=num_samples) ])
 		return s[:,:,:self.state_dim], s[:,:,self.state_dim:]
 
-	def train(self, epochs, batch_size=128, sample_interval=50):
+	def train(self, epochs, batch_size=128, sample_interval=50, repeat_disc = 1, repeat_gen = 1):
 		
 		# adversarial ground truths
 		valid = np.ones((batch_size, 1))
 		fake = np.zeros((batch_size, 1))
-		noisy_valid = np.random.uniform(0.7, 1.0, (batch_size, 1))
-		noisy_fake = np.random.uniform(0, 0.3, (batch_size, 1))
+		noisy_valid = np.repeat(0.9, batch_size)
+		noisy_fake = np.repeat(0.1, batch_size)
 
 		try:
 			os.mkdir('model')
@@ -155,27 +166,30 @@ class MetaAgent():
 
 				# state_samples is a tensor of shape (batch_size, deg_pack, state_dim)
 				# action_samples is a tensor of shape (batch_size, deg_pack, action_dim)
-				state_samples, action_samples = self.get_samples(batch_size)
 
-				noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
-				repeated_noise = noise.repeat(self.deg_pack, axis=0)
+				d_loss = 0
+				for i in range(repeat_disc):					
+					state_samples, action_samples = self.get_samples(batch_size)
 
-				flattened = np.reshape(state_samples, (batch_size * self.deg_pack, -1))
-				gen_action_samples = self.generator.predict([repeated_noise, flattened]).reshape((batch_size, self.deg_pack, -1))
+					noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
+					repeated_noise = noise.repeat(self.deg_pack, axis=0)
 
-				d_loss_real = self.discriminator.train_on_batch([state_samples, action_samples], valid)
-				d_loss_fake = self.discriminator.train_on_batch([state_samples, gen_action_samples], fake)
-				d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
+					flattened = np.reshape(state_samples, (batch_size * self.deg_pack, -1))
+					gen_action_samples = self.generator.predict([repeated_noise, flattened]).reshape((batch_size, self.deg_pack, -1))
+
+					d_loss_real = self.discriminator.train_on_batch([state_samples, action_samples], valid)
+					d_loss_fake = self.discriminator.train_on_batch([state_samples, gen_action_samples], fake)
+					d_loss += 0.5 * np.add(d_loss_real, d_loss_fake)
 
 				# ---------------------
 				#  Train Generator
 				# ---------------------
+				g_loss = 0
+				for i in range(repeat_gen):
+					state_samples, _ = self.get_samples(batch_size)
+					g_loss += self.combined.train_on_batch([noise, state_samples], valid)
 
-				state_samples, _ = self.get_samples(batch_size)
-
-				g_loss = self.combined.train_on_batch([noise, state_samples], valid)
-
-				print ("%d [D loss: %f, acc.: %.2f%%] [G loss: %f]" % (epoch, d_loss[0], 100*d_loss[1], g_loss))
+				print ("%d [D loss: %f, real acc.: %.2f%%, fake acc.: %.2f%%] [G loss: %f]" % (epoch, d_loss[0], 100*d_loss_real[1], 100*d_loss_fake[1], g_loss))
 
 				if np.isnan(d_loss[0]) or np.isnan(g_loss):
 					break
@@ -208,7 +222,8 @@ class MetaAgent():
 		plt.show()
 
 if __name__ == '__main__':
+	K.clear_session()
 	use_saved = sys.argv[1] if len(sys.argv) > 1 else None
-	meta_agent = MetaAgent(use_saved)
+	meta_agent = MetaAgent(use_saved, pretrain = True)
 	meta_agent.load_data()
-	meta_agent.train(epochs=1000, batch_size=256, sample_interval=200)
+	meta_agent.train(epochs=3000, batch_size=64, sample_interval=200)
