@@ -3,7 +3,7 @@ from keras.models import Sequential, Model, load_model
 from keras.layers import Flatten, Input, Dense, Dropout, BatchNormalization, Lambda, GRU, LSTM, Bidirectional, concatenate
 from keras.layers.advanced_activations import LeakyReLU
 from keras.regularizers import l2
-from keras.optimizers import Adam, SGD, RMSprop, Nadam, Adagrad, Adadelta
+from keras.optimizers import Adam, SGD, RMSprop, Nadam, Adagrad, Adadelta, Adamax
 
 import sys
 import numpy as np
@@ -12,32 +12,36 @@ import os
 import glob
 import matplotlib.pyplot as plt
 
-def _loss(y_true, y_pred):
-	return -K.mean(K.log(y_pred))
 
 class MetaAgent():
 	def __init__(self,use_saved, pretrain = False):
 		# Input shape
-		self.latent_dim = 100 # latent dimension
+		self.latent_dim = 239 # latent dimension
 		self.state_dim = 561 # state dimension
+		#self.state_dim = 572
 		self.action_dim = 20 # action dimension
-		self.deg_pack = 8 # packing degree (number of samples to send to discriminator)
+		self.deg_pack = 12 # packing degree (number of samples to send to discriminator)
 		self.forward_dim = 1154
+		#self.forward_dim = 0
 		np.random.seed()
+
 		#Generator
-		g_opt = Adam(lr=0.0002, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False, clipvalue = 1)
+		#g_opt = Adam(0.0001, 0.5, clipvalue=5)
+		g_opt = Adamax(lr=0.0001, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0)
 		#g_opt = SGD(0.001)
 		#g_opt = RMSprop(lr=0.001, clipvalue = 1)
-		#g_opt = Nadam(0.001, 0.5, clipvalue=3)
+		#g_opt = Nadam(0.0001, 0.5, clipvalue=2)
 		#g_opt = Adagrad(lr=0.01, epsilon=None, decay=0.0, clipnorm = 5)
 		#g_opt = Adadelta(lr=1.0, rho=0.95, epsilon=None, decay=0.0, clipnorm = 3)
 
 		#Discriminator
-		d_opt = Adam(lr=0.0002, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False, clipvalue = 1)
+		d_opt = Adam(0.0005, 0.5, clipvalue=5)
+		#d_opt = Adamax(lr=0.0003, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0)
 		#d_opt = SGD(0.001)
 		#d_opt = Adagrad(lr=0.01, epsilon=None, decay=0.0, clipnorm = 5)
+		#d_opt = Adadelta(lr=1.0, rho=0.95, epsilon=None, decay=0.0, clipnorm = 3)
 		#d_opt = RMSprop(lr=0.001, clipvalue = 1)
-		#d_opt = Nadam(0.0001, 0.5, clipvalue=3)
+		#d_opt = Nadam(0.0001, 0.5, clipvalue=2)
 
 		# build generator and discriminator
 		if use_saved:
@@ -68,22 +72,22 @@ class MetaAgent():
 		valid = self.discriminator([states, actions])
 
 		self.combined = Model([noise, states], valid)
-		#self.combined.compile(loss=['kullback_leibler_divergence'], optimizer=g_opt)
+		#self.combined.compile(loss=self.boundary_loss, optimizer=g_opt)
 		self.combined.compile(loss=['binary_crossentropy'], optimizer=g_opt)
+
+	def boundary_loss(self, y_true, y_pred):
+		return 0.5 * K.mean((K.log(y_pred) - K.log(1 - y_pred))**2)
 
 	def build_generator(self):
 		model = Sequential([
-			Dense(500, input_dim=self.latent_dim + self.state_dim),
+			Dense(256, input_dim=self.latent_dim + self.state_dim),
 			LeakyReLU(alpha=0.2),
 			BatchNormalization(momentum=0.8),
-			Dropout(rate = 0.5),
-			Dense(300),
+			Dense(128),
 			LeakyReLU(alpha=0.2),
 			BatchNormalization(momentum=0.8),
-			Dense(100),
-			LeakyReLU(alpha=0.2),
-			BatchNormalization(momentum=0.8),
-			Dense(self.action_dim, activation='sigmoid'),
+			Dense(64, activation = 'sigmoid'),
+			Dense(self.action_dim, activation='softmax'),
 		])
 
 		noise = Input(shape=(self.latent_dim,))
@@ -95,14 +99,14 @@ class MetaAgent():
 	def build_discriminator(self):
 		model = Sequential([
 			#Flatten(),
-			Bidirectional(LSTM(64,input_shape=(self.state_dim+self.action_dim,))),
-			Dense(300, kernel_regularizer=l2(0.001)),
+			Bidirectional(LSTM(512,input_shape=(self.state_dim+self.action_dim,))),
 			LeakyReLU(alpha=0.2),
-			Dropout(rate = 0.5),
-			Dense(200, kernel_regularizer=l2(0.001)),
+			Dense(256, kernel_regularizer=l2(0.001)),
+			BatchNormalization(momentum=0.8),
 			LeakyReLU(alpha=0.2),
-			Dropout(rate = 0.5),
-			Dense(100, kernel_regularizer=l2(0.001)),
+			Dropout(0.4),
+			Dense(128, kernel_regularizer=l2(0.001)),
+			BatchNormalization(momentum=0.8),
 			LeakyReLU(alpha=0.2),
 			Dense(1, activation='sigmoid'),
 		])
@@ -128,7 +132,7 @@ class MetaAgent():
 					if turn[0] == 45:
 						# break
 						continue
-					d.append([(bit-48) for bit in turn[:581]])
+					d.append([(bit-48) for bit in turn[:self.state_dim + self.action_dim]])
 			print("done loading agent {}".format(agent))
 			ds.append(d)
 		self.ds = ds
@@ -180,6 +184,10 @@ class MetaAgent():
 					d_loss_real = self.discriminator.train_on_batch([state_samples, action_samples], valid)
 					d_loss_fake = self.discriminator.train_on_batch([state_samples, gen_action_samples], fake)
 					d_loss += 0.5 * np.add(d_loss_real, d_loss_fake)
+				
+				#flip labels once
+				#d_loss_real = self.discriminator.train_on_batch([state_samples, action_samples], fake)
+				#d_loss_fake = self.discriminator.train_on_batch([state_samples, gen_action_samples], valid)
 
 				# ---------------------
 				#  Train Generator
@@ -226,4 +234,4 @@ if __name__ == '__main__':
 	use_saved = sys.argv[1] if len(sys.argv) > 1 else None
 	meta_agent = MetaAgent(use_saved, pretrain = True)
 	meta_agent.load_data()
-	meta_agent.train(epochs=3000, batch_size=64, sample_interval=200)
+	meta_agent.train(epochs=5000, batch_size=32, sample_interval=200, repeat_disc= 5, repeat_gen=1)

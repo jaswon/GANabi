@@ -3,7 +3,7 @@ import numpy as np
 import random
 from deap import base, creator, tools, algorithms, cma
 import matplotlib.pyplot as plt
-from keras.optimizers import RMSprop
+from keras.optimizers import Adam
 
 #Loads data from a file
 def load_data(dataFile, samples = 50000):
@@ -35,8 +35,7 @@ def load_data(dataFile, samples = 50000):
 #Loads generator model and compiles
 def get_model(modelName):
     model = load_model(modelName)
-    opt = RMSprop(lr=0.001)
-    model.compile(optimizer = opt, loss=['categorical_crossentropy'], metrics = ['accuracy'])
+    model.compile(optimizer = Adam(lr = 0.001), loss=['categorical_crossentropy'], metrics = ['accuracy'])
     return model
 
 #Fitness Function
@@ -47,7 +46,7 @@ def evaluate(individaul):
 
 class Evolution():
     def __init__(self, tournamentSize = 3, independence = 0.1):
-        self.latent_dim = 100
+        self.latent_dim = 239
         self.toolbox = None
         self.stats = None
         self.generations = 0
@@ -72,7 +71,7 @@ class Evolution():
         toolbox.register("evaluate", evaluate)
 
         #cma strategy, can add lambda_= pop_size
-        strategy = cma.Strategy(centroid=np.random.normal(0,1, (100,)), sigma=1.0)
+        strategy = cma.Strategy(centroid=np.random.normal(0,1, (self.latent_dim,)), sigma=1.0)
         toolbox.register("generate", strategy.generate, creator.Individual)
         toolbox.register("update", strategy.update)
 
@@ -156,11 +155,20 @@ class Evolution():
 
     def predict(self, model, state, action, name):
         latent_space = np.tile(np.array(self.hof[0]), (state.shape[0], 1))
+        print(state.shape[0])
         labels = model.predict([latent_space, state])
+        sample_size = 1000
+        samples = []
         gen = [0 for i in range(20)]
+        s = 0
         for lab in labels:
             gen[np.argmax(lab)] += 1
+            s+= 1
+            if s % sample_size == 0:
+                samples.append([np.argmax(lab), lab[np.argmax(lab)]])
         real = [0 for i in range(20)]
+        print(samples)
+        s= 0
         for lab in action:
             real[np.argmax(lab)] += 1
         fig, ax = plt.subplots()
@@ -177,7 +185,7 @@ class Evolution():
 
 if __name__ == '__main__':
     total = 10000
-    state, action = load_data("data/iggi.txt", samples = total)
+    state, action = load_data("data/piers.txt", samples = total)
     inputs = state
     outputs = action
     x = ["model"]
@@ -186,7 +194,7 @@ if __name__ == '__main__':
         ### Uses Tournament Selection right now randomized - (Best of [tournamentsize]) 
         ev = Evolution(tournamentSize = 5, independence = 0.1) 
         #individuals = ev.evolve(crossover_prob = 0.5, mutation_prob = 0.5, num_generation = 150, pop_size = 30)
-        individuals, hof  = ev.evolve_preset(crossover_prob = 0.9, mutation_prob = 0.1, num_generation = 25, pop_size = 100)
+        individuals, hof  = ev.evolve_preset(crossover_prob = 0.9, mutation_prob = 0.1, num_generation = 100, pop_size = 100)
         ev.predict(model, state, action, name + "Distribution")
         ev.plot(name)
 

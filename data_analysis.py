@@ -48,13 +48,15 @@ def plot_distribution(data):
 #data = split_data(state, action)
 
 #plot_distribution(data)
-model_name = "models/bidirectional/"
+model_name = "model_3/"
 model = load_model(model_name + "discriminator.h5")
 #model.summary()
 i = 0
 for layer in model.layers:
+    i += 1
     config = layer.get_config()
-    for l in config['layers']:
-        print(l)
+    if (i == 4):
+        for l in config['layers']:
+            print(l)
 
 
