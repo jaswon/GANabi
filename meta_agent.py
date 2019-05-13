@@ -16,11 +16,11 @@ import matplotlib.pyplot as plt
 class MetaAgent():
 	def __init__(self,use_saved, pretrain = False):
 		# Input shape
-		self.latent_dim = 239 # latent dimension
+		self.latent_dim = 50 # latent dimension
 		self.state_dim = 561 # state dimension
 		#self.state_dim = 572
 		self.action_dim = 20 # action dimension
-		self.deg_pack = 12 # packing degree (number of samples to send to discriminator)
+		self.deg_pack = 6 # packing degree (number of samples to send to discriminator)
 		self.forward_dim = 1154
 		#self.forward_dim = 0
 		np.random.seed()
@@ -35,7 +35,7 @@ class MetaAgent():
 		#g_opt = Adadelta(lr=1.0, rho=0.95, epsilon=None, decay=0.0, clipnorm = 3)
 
 		#Discriminator
-		d_opt = Adam(0.0005, 0.5, clipvalue=5)
+		d_opt = Adam(0.0001, 0.5, clipvalue=5)
 		#d_opt = Adamax(lr=0.0003, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0)
 		#d_opt = SGD(0.001)
 		#d_opt = Adagrad(lr=0.01, epsilon=None, decay=0.0, clipnorm = 5)
@@ -83,10 +83,12 @@ class MetaAgent():
 			Dense(256, input_dim=self.latent_dim + self.state_dim),
 			LeakyReLU(alpha=0.2),
 			BatchNormalization(momentum=0.8),
+			Dropout(0.4),
 			Dense(128),
 			LeakyReLU(alpha=0.2),
 			BatchNormalization(momentum=0.8),
 			Dense(64, activation = 'sigmoid'),
+			BatchNormalization(momentum=0.8),
 			Dense(self.action_dim, activation='softmax'),
 		])
 
@@ -101,6 +103,7 @@ class MetaAgent():
 			#Flatten(),
 			Bidirectional(LSTM(512,input_shape=(self.state_dim+self.action_dim,))),
 			LeakyReLU(alpha=0.2),
+			BatchNormalization(momentum=0.8),
 			Dense(256, kernel_regularizer=l2(0.001)),
 			BatchNormalization(momentum=0.8),
 			LeakyReLU(alpha=0.2),
