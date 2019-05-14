@@ -56,13 +56,13 @@ data = split_data(state, action)
 plot_distribution(data)
 
 """
-agents = [ "iggi"]
+agents = [ "outer"]
 for agent in agents:
-    state, action = load_data("data/{0}.txt".format(agent), samples = 400000)
+    state, action = load_data("data/{0}.txt".format(agent), samples = None)
     data = split_data(state, action)
 
     test_size = 10000
-    train_sizes = [20000, 50000, 100000, 200000]
+    train_sizes = [-1]
     for train in train_sizes:
         test_state = state[:test_size]
         test_action = action[:test_size]
