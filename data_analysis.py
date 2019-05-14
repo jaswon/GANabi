@@ -58,7 +58,7 @@ plot_distribution(data)
 """
 agents = [ "outer"]
 for agent in agents:
-    state, action = load_data("data/{0}.txt".format(agent), samples = 600000)
+    state, action = load_data("data/{0}.txt".format(agent), samples = 400000)
     data = split_data(state, action)
 
     test_size = 10000
@@ -84,7 +84,7 @@ for agent in agents:
         opt = Adam(0.001, 0.5, clipvalue=5)
         model.compile(loss=['categorical_crossentropy'], optimizer = opt, metrics = ['accuracy'])
 
-        model.fit(train_state, train_action, epochs = 40)
+        model.fit(train_state, train_action, epochs = 20)
         loss, acc = model.evaluate(test_state, test_action)
         predicted = model.predict(test_state)
         model.save("{0}{1}.h5".format(agent, train))
