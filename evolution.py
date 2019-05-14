@@ -46,7 +46,7 @@ def evaluate(individaul):
 
 class Evolution():
     def __init__(self, tournamentSize = 3, independence = 0.1):
-        self.latent_dim = 239
+        self.latent_dim = 50
         self.toolbox = None
         self.stats = None
         self.generations = 0
@@ -153,39 +153,30 @@ class Evolution():
         plt.savefig("Evolution/" + name)
         plt.close()
 
-    def predict(self, model, state, action, name):
+    def predict(self, model, state, action, name, total):
         latent_space = np.tile(np.array(self.hof[0]), (state.shape[0], 1))
         print(state.shape[0])
         labels = model.predict([latent_space, state])
         sample_size = 1000
-        samples = []
         gen = [0 for i in range(20)]
-        s = 0
         for lab in labels:
             gen[np.argmax(lab)] += 1
-            s+= 1
-            if s % sample_size == 0:
-                samples.append([np.argmax(lab), lab[np.argmax(lab)]])
         real = [0 for i in range(20)]
-        print(samples)
-        s= 0
         for lab in action:
             real[np.argmax(lab)] += 1
-        fig, ax = plt.subplots()
-        np.array(gen).shape
-        ax.bar(np.arange(0, 20, step = 1), np.array(gen) / total, label = "Generated")
-        ax.bar(np.arange(0.5, 20.5, step = 1), np.array(real) / total, label = "Real")
-        ax.set_xlabel("Label")
-        ax.set_ylabel("Samples")
-        ax.set_title("Evolved Generator")
-        ax.legend()
+        plt.bar(np.arange(0,20, step = 1), np.array(real) / total, label = "Real", width = 0.5)
+        plt.bar(np.arange(0.5,20.5, step = 1), np.array(gen) / total, label = "Predicted", width = 0.5)
+        plt.xlabel("Label")
+        plt.ylabel("Samples")
+        plt.title("Evolved Generator")
+        plt.legend()
         plt.grid(True)
         plt.savefig("Evolution/" + name)
         plt.close()
 
 if __name__ == '__main__':
     total = 10000
-    state, action = load_data("data/piers.txt", samples = total)
+    state, action = load_data("data/iggi.txt", samples = total)
     inputs = state
     outputs = action
     x = ["model"]
@@ -195,6 +186,6 @@ if __name__ == '__main__':
         ev = Evolution(tournamentSize = 5, independence = 0.1) 
         #individuals = ev.evolve(crossover_prob = 0.5, mutation_prob = 0.5, num_generation = 150, pop_size = 30)
         individuals, hof  = ev.evolve_preset(crossover_prob = 0.9, mutation_prob = 0.1, num_generation = 100, pop_size = 100)
-        ev.predict(model, state, action, name + "Distribution")
+        ev.predict(model, state, action, name + "Distribution", total)
         ev.plot(name)
 

@@ -124,7 +124,7 @@ class MetaAgent():
 		print("loading data")
 		# ds is a numpy array of shape (num_agents, num_turns, state_dim + action_dim)
 		ds = []
-		for agent in glob.glob("data/*.txt"):
+		for agent in glob.glob("old_data/*.txt"):
 			d = []
 			with open(agent, "rb") as f:
 				# while True:
