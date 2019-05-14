@@ -58,7 +58,7 @@ plot_distribution(data)
 """
 agents = [ "outer"]
 for agent in agents:
-    state, action = load_data("data/{0}.txt".format(agent), samples = None)
+    state, action = load_data("data/{0}.txt".format(agent), samples = 600000)
     data = split_data(state, action)
 
     test_size = 10000
