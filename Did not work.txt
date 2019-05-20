@@ -1,0 +1,2 @@
+Batchsize = 32, 200
+packing = 4, 6
